@@ -1,0 +1,698 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next pisces use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/vendors/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.googleapis.com/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+<link href="/vendors/font-awesome/css/font-awesome.min.css?v=4.4.0" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="Lock,NSLock,NSCondition,NSConditionLock,NSRecursiveLock,OSSpinLock,pthread_mutex,pthread_rwlock,dispatch_semaphore,synchronized," />
+
+
+
+
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="本来没打算测试这些方案的，因为各种方案的出现都是针对具体场景设计的，做同一场景的测试没有很大的必要，但看了网上很多博主的评测，感觉还是有必要简单整理一下。
+补充在线程同步的上一篇文章中提到了读写锁，也是线程同步解决方案之一，没有做详细整理，后来查了一下pthread库，里面是有提供读写锁pthread_rwlock的，在这做一下补充。此外pthread库里还有pthread_cond也可以实现线程">
+<meta property="og:type" content="article">
+<meta property="og:title" content="线程同步解决方案，简单测试">
+<meta property="og:url" content="http://boztrail.github.io/2016/06/19/lock-test/index.html">
+<meta property="og:site_name" content="Boz Trail">
+<meta property="og:description" content="本来没打算测试这些方案的，因为各种方案的出现都是针对具体场景设计的，做同一场景的测试没有很大的必要，但看了网上很多博主的评测，感觉还是有必要简单整理一下。
+补充在线程同步的上一篇文章中提到了读写锁，也是线程同步解决方案之一，没有做详细整理，后来查了一下pthread库，里面是有提供读写锁pthread_rwlock的，在这做一下补充。此外pthread库里还有pthread_cond也可以实现线程">
+<meta property="og:image" content="http://boztrail.github.io/lock-test/test.png">
+<meta property="og:updated_time" content="2016-06-19T02:16:27.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="线程同步解决方案，简单测试">
+<meta name="twitter:description" content="本来没打算测试这些方案的，因为各种方案的出现都是针对具体场景设计的，做同一场景的测试没有很大的必要，但看了网上很多博主的评测，感觉还是有必要简单整理一下。
+补充在线程同步的上一篇文章中提到了读写锁，也是线程同步解决方案之一，没有做详细整理，后来查了一下pthread库，里面是有提供读写锁pthread_rwlock的，在这做一下补充。此外pthread库里还有pthread_cond也可以实现线程">
+<meta name="twitter:image" content="http://boztrail.github.io/lock-test/test.png">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Pisces',
+    sidebar: {"position":"left","display":"always"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: '博主'
+    }
+  };
+</script>
+
+
+
+
+  <link rel="canonical" href="http://boztrail.github.io/2016/06/19/lock-test/"/>
+
+  <title> 线程同步解决方案，简单测试 | Boz Trail </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?23d68aa81c63df3f458b440864468232";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Boz Trail</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">喜则息，忧则行。</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br />
+            
+            关于
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                线程同步解决方案，简单测试
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">发表于</span>
+            <time itemprop="dateCreated" datetime="2016-06-19T09:14:55+08:00" content="2016-06-19">
+              2016-06-19
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/iOS/" itemprop="url" rel="index">
+                    <span itemprop="name">iOS</span>
+                  </a>
+                </span>
+
+                
+                
+                  ， 
+                
+
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/iOS/线程同步/" itemprop="url" rel="index">
+                    <span itemprop="name">线程同步</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/06/19/lock-test/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/06/19/lock-test/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>本来没打算测试这些方案的，因为各种方案的出现都是针对具体场景设计的，做同一场景的测试没有很大的必要，但看了网上很多博主的评测，感觉还是有必要简单整理一下。</p>
+<h2 id="补充"><a href="#补充" class="headerlink" title="补充"></a>补充</h2><p>在线程同步的上一篇文章中提到了读写锁，也是线程同步解决方案之一，没有做详细整理，后来查了一下pthread库，里面是有提供读写锁<strong>pthread_rwlock</strong>的，在这做一下补充。此外pthread库里还有pthread_cond也可以实现线程同步，有兴趣可以查阅了解。</p>
+<h3 id="pthread-rwlock"><a href="#pthread-rwlock" class="headerlink" title="pthread_rwlock"></a>pthread_rwlock</h3><h4 id="特性"><a href="#特性" class="headerlink" title="特性"></a>特性</h4><p>读写锁的设计是为了解决在既有读又有写的场景，读的操作明显比写的操作多，保证多线程在没有写操作的时候可以同时做读操作。</p>
+<h4 id="使用"><a href="#使用" class="headerlink" title="使用"></a>使用</h4><figure class="highlight objc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line"><span class="built_in">NSMutableDictionary</span> *dict = [<span class="built_in">NSMutableDictionary</span> dictionary];</div><div class="line"><span class="comment">// 创建</span></div><div class="line">pthread_rwlockattr_t attr;</div><div class="line">pthread_rwlockattr_init(&amp;attr);</div><div class="line">pthread_rwlock_init(&amp;_mutex, &amp;attr);</div><div class="line">pthread_rwlockattr_destroy(&amp;attr);</div><div class="line"><span class="comment">// 读操作</span></div><div class="line">pthread_rwlock_rdlock(&amp;_mutex);</div><div class="line"><span class="keyword">id</span> obj = [dict objectForKey:<span class="string">@"trial"</span>];</div><div class="line">pthread_rwlock_unlock(&amp;_mutex);</div><div class="line"><span class="comment">// 写操作</span></div><div class="line">pthread_rwlock_wrlock(&amp;_mutex);</div><div class="line">[dict setObject:<span class="string">@"boz"</span> forKey:<span class="string">@"trial"</span>];</div><div class="line">pthread_rwlock_unlock(&amp;_mutex);</div><div class="line"><span class="comment">// 释放</span></div><div class="line">pthread_rwlock_destroy(&amp;_mutex);</div></pre></td></tr></table></figure>
+<h2 id="简单测试"><a href="#简单测试" class="headerlink" title="简单测试"></a>简单测试</h2><h3 id="测试方法"><a href="#测试方法" class="headerlink" title="测试方法"></a>测试方法</h3><p>测试方法很简单，在这口述一下，测试代码有点乱，就不整理了。</p>
+<ul>
+<li>测试设备：iPhone6s iOS 9.3.2。</li>
+<li>测试场景：选择Objective-C中NSMutableDictionary的读写，首先继承NSMutableDictionary实现NSMutableDictionary的子类，覆写读写方法，读写操作用各种不同的线程同步方案包装，然后写测试代码。先在主线程中对NSMutableDictionary的对象实例做100000次的读写操作，测得操作执行时间，然后针对每种方案会启多个线程对同一NSMutableDictionary子类对象实例做10000次读写操作，随后在主线程中做100000次读写操作，测得主线程读写操作执行时间。</li>
+<li>数据整理：每种方案的时间减去普通NSMutableDictionary对象读写操作的时间。</li>
+</ul>
+<h3 id="测试结论"><a href="#测试结论" class="headerlink" title="测试结论"></a>测试结论</h3><p>最终的测试结果大概如下图所示:</p>
+<p><img src="lock-test/test.png" alt="测试结果"></p>
+<p>如上图显示，OSSpinLock、dispatch_semaphore、pthread_rwlock的速度明显靠前，但网上说pthread_mutex应该是仅次于OSSpinLock，不知道是测试方法还是场景的原因，并没有得出同样的结论，嘛，反正就这样吧。</p>
+<p>最后，以上测试结果仅供参考!!!</p>
+
+      
+    </div>
+
+    <div>
+      
+        
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Lock/" rel="tag">#Lock</a>
+          
+            <a href="/tags/NSLock/" rel="tag">#NSLock</a>
+          
+            <a href="/tags/NSCondition/" rel="tag">#NSCondition</a>
+          
+            <a href="/tags/NSConditionLock/" rel="tag">#NSConditionLock</a>
+          
+            <a href="/tags/NSRecursiveLock/" rel="tag">#NSRecursiveLock</a>
+          
+            <a href="/tags/OSSpinLock/" rel="tag">#OSSpinLock</a>
+          
+            <a href="/tags/pthread-mutex/" rel="tag">#pthread_mutex</a>
+          
+            <a href="/tags/pthread-rwlock/" rel="tag">#pthread_rwlock</a>
+          
+            <a href="/tags/dispatch-semaphore/" rel="tag">#dispatch_semaphore</a>
+          
+            <a href="/tags/synchronized/" rel="tag">#synchronized</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2016/06/15/lock/" rel="next" title="线程同步解决方案，各种锁">
+                <i class="fa fa-chevron-left"></i> 线程同步解决方案，各种锁
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2016/07/16/chinese-transform/" rel="prev" title="CFStringTransform汉字转拼音">
+                CFStringTransform汉字转拼音 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2016/06/19/lock-test/"
+           data-title="线程同步解决方案，简单测试" data-url="http://boztrail.github.io/2016/06/19/lock-test/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar.png"
+               alt="Boz" />
+          <p class="site-author-name" itemprop="name">Boz</p>
+          <p class="site-description motion-element" itemprop="description">以此站点来mark自己的成长。</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">9</span>
+              <span class="site-state-item-name">日志</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              <a href="/categories">
+                <span class="site-state-item-count">8</span>
+                <span class="site-state-item-name">分类</span>
+              </a>
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">35</span>
+                <span class="site-state-item-name">标签</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+
+        <div class="links-of-author motion-element">
+          
+        </div>
+
+        
+        
+
+        
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#补充"><span class="nav-number">1.</span> <span class="nav-text">补充</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#pthread-rwlock"><span class="nav-number">1.1.</span> <span class="nav-text">pthread_rwlock</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#特性"><span class="nav-number">1.1.1.</span> <span class="nav-text">特性</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#使用"><span class="nav-number">1.1.2.</span> <span class="nav-text">使用</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#简单测试"><span class="nav-number">2.</span> <span class="nav-text">简单测试</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#测试方法"><span class="nav-number">2.1.</span> <span class="nav-text">测试方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#测试结论"><span class="nav-number">2.2.</span> <span class="nav-text">测试结论</span></a></li></ol></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy; 
+  <span itemprop="copyrightYear">2017</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Boz</span>
+</div>
+
+<div class="powered-by">
+  由 <a class="theme-link" href="http://hexo.io">Hexo</a> 强力驱动
+</div>
+
+<div class="theme-info">
+  主题 -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Pisces
+  </a>
+</div>
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="/vendors/jquery/index.js?v=2.1.3"></script>
+
+  
+  <script type="text/javascript" src="/vendors/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+
+  
+  <script type="text/javascript" src="/vendors/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+
+  
+  <script type="text/javascript" src="/vendors/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/vendors/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/vendors/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.0.1"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"boztrail"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+  
+
+
+
+
+
+
+  
+  
+  
+
+  
+
+  
+
+</body>
+</html>

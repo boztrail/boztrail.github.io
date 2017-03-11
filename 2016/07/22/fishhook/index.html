@@ -1,0 +1,682 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next pisces use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/vendors/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.googleapis.com/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+<link href="/vendors/font-awesome/css/font-awesome.min.css?v=4.4.0" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="iOS,Fishhook,hook," />
+
+
+
+
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="在iOS开发中，在不干预实现源码的情况下，想要要改变这个方法的实现（比如替换或追加实现）存在多种方案，可以继承重写、借助类别，或者依赖Method Swizzling，但是这些都是基于面向对象语言Objective-C才能实现的，如果是一个C实现的函数方法，这些方案都是行不通的。
+那对于C函数方法的拦截，有什么比较靠谱的方案呢，简单google一下，发现Fishhook比较火热，自己之前也没了解过">
+<meta property="og:type" content="article">
+<meta property="og:title" content="iOS Fishhook">
+<meta property="og:url" content="http://boztrail.github.io/2016/07/22/fishhook/index.html">
+<meta property="og:site_name" content="Boz Trail">
+<meta property="og:description" content="在iOS开发中，在不干预实现源码的情况下，想要要改变这个方法的实现（比如替换或追加实现）存在多种方案，可以继承重写、借助类别，或者依赖Method Swizzling，但是这些都是基于面向对象语言Objective-C才能实现的，如果是一个C实现的函数方法，这些方案都是行不通的。
+那对于C函数方法的拦截，有什么比较靠谱的方案呢，简单google一下，发现Fishhook比较火热，自己之前也没了解过">
+<meta property="og:image" content="http://boztrail.github.io/fishhook/fishhook.png">
+<meta property="og:updated_time" content="2016-07-25T02:05:07.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="iOS Fishhook">
+<meta name="twitter:description" content="在iOS开发中，在不干预实现源码的情况下，想要要改变这个方法的实现（比如替换或追加实现）存在多种方案，可以继承重写、借助类别，或者依赖Method Swizzling，但是这些都是基于面向对象语言Objective-C才能实现的，如果是一个C实现的函数方法，这些方案都是行不通的。
+那对于C函数方法的拦截，有什么比较靠谱的方案呢，简单google一下，发现Fishhook比较火热，自己之前也没了解过">
+<meta name="twitter:image" content="http://boztrail.github.io/fishhook/fishhook.png">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Pisces',
+    sidebar: {"position":"left","display":"always"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: '博主'
+    }
+  };
+</script>
+
+
+
+
+  <link rel="canonical" href="http://boztrail.github.io/2016/07/22/fishhook/"/>
+
+  <title> iOS Fishhook | Boz Trail </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?23d68aa81c63df3f458b440864468232";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Boz Trail</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">喜则息，忧则行。</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br />
+            
+            关于
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                iOS Fishhook
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">发表于</span>
+            <time itemprop="dateCreated" datetime="2016-07-22T12:40:35+08:00" content="2016-07-22">
+              2016-07-22
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/iOS/" itemprop="url" rel="index">
+                    <span itemprop="name">iOS</span>
+                  </a>
+                </span>
+
+                
+                
+                  ， 
+                
+
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/iOS/hook/" itemprop="url" rel="index">
+                    <span itemprop="name">hook</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/07/22/fishhook/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/07/22/fishhook/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>在iOS开发中，在不干预实现源码的情况下，想要要改变这个方法的实现（比如替换或追加实现）存在多种方案，可以继承重写、借助类别，或者依赖Method Swizzling，但是这些都是基于面向对象语言Objective-C才能实现的，如果是一个C实现的函数方法，这些方案都是行不通的。</p>
+<p>那对于C函数方法的拦截，有什么比较靠谱的方案呢，简单google一下，发现<a href="https://github.com/facebook/fishhook" target="_blank" rel="external"><strong>Fishhook</strong></a>比较火热，自己之前也没了解过C相关的hook方案，在此简单备注。</p>
+<h2 id="什么是fishhook"><a href="#什么是fishhook" class="headerlink" title="什么是fishhook?"></a>什么是fishhook?</h2><p>fishhook 是Facebook开源的一种C函数的hook方案，它的实现原理是动态修改Mach-O符号表，Mach-O是Mach Object文件格式的缩写，iOS的app可执行文件格式就是Mach-O。</p>
+<h3 id="fishhook-原理"><a href="#fishhook-原理" class="headerlink" title="fishhook 原理"></a>fishhook 原理</h3><p>参考fishhook官方文档“How it works”,链接关系表如下图:<br><img src="fishhook/fishhook.png" alt="符号表链接图(来源网络)"></p>
+<p>dyld 通过更新在Match-O二进制文件<strong>__</strong>DATA特定部分的函数指针来链接lazy和non-lazy两种符号表，fishhook通过确定位置去更新每个符号的名字链接到rebind_symbols并添加相应的替代品以实现重绑。</p>
+<p>如图所示，<strong>__</strong>DATA区包含和动态链接相关的两部分:<strong>__</strong>nl_symbol_ptr 和 <strong>__</strong>la_symbol_ptr。<strong>__</strong>nl_symbol_ptr为一个指针数字直接非惰性绑定数据，<strong>__</strong>la_symbol_ptr也是一个指针数组，在第一次调用的时候通过dyld_stub_binder辅助链接。为了寻找一个符号名的特定位置，需要经过几层间接跳转。对于<strong>__</strong>DATA这两部分，<strong>&lt;</strong>match-o/loader.h<strong>&gt;</strong>结构体部分提供了偏移量进入间接符号表。间接符号表位于二进制的<strong>__</strong>LINKEDIT段，仅仅是一个索引到符号表的数组，它的排序在non-lazy 和 lazy两部分是相同的。因此，获取struct section nl_symbol_ptr，在符号表第一地址的位置就是indirect_symbol_table[nl_symbol_ptr-&gt;reserved1]。符号表本身是一个struct nlist的数组(参考<strong>&lt;</strong>mach-o/nlist.h<strong>&gt;</strong>)，每个nlist包含进入<strong>__</strong>LINKEDIT里字符表位置，这个位置存着实际的符号表。所以，对于每个<strong>__</strong>nl_symbol_ptr和<strong>__</strong>la_symbol_ptr 的指针，我们能够找到相应的符号，然后将相应的字符串和想替换的字符串进行比较，如果匹配，我们就以新添加的指针替换原指针。</p>
+<h2 id="fishhook-的简单尝试"><a href="#fishhook-的简单尝试" class="headerlink" title="fishhook 的简单尝试"></a>fishhook 的简单尝试</h2><p>拦截 socket函数int socket(int, int, int);和int connect(int, const struct sockaddr *, socklen_t)做简单尝试：</p>
+<figure class="highlight objc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#import <span class="meta-string">"AppDelegate.h"</span></span></div><div class="line"><span class="meta">#import <span class="meta-string">"fishhook.h"</span></span></div><div class="line"></div><div class="line"><span class="keyword">static</span> <span class="keyword">int</span> (*orig_socket)(<span class="keyword">int</span>, <span class="keyword">int</span>, <span class="keyword">int</span>);</div><div class="line"><span class="keyword">static</span> <span class="keyword">int</span> (*orig_connect)(<span class="keyword">int</span>, <span class="keyword">const</span> <span class="keyword">struct</span> sockaddr *, socklen_t);</div><div class="line"></div><div class="line"><span class="keyword">int</span> my_socket(<span class="keyword">int</span> domain, <span class="keyword">int</span> type, <span class="keyword">int</span> protocol)</div><div class="line">&#123;</div><div class="line">printf(<span class="string">"this is my socket!"</span>);</div><div class="line"><span class="keyword">return</span> orig_socket(domain,type,protocol);;</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="keyword">int</span> my_connect(<span class="keyword">int</span> socket, <span class="keyword">const</span> <span class="keyword">struct</span> sockaddr * addr, socklen_t len)</div><div class="line">&#123;</div><div class="line">printf(<span class="string">"this is my connect"</span>);</div><div class="line"><span class="keyword">return</span> orig_connect(socket,addr,len);</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="class"><span class="keyword">@implementation</span> <span class="title">AppDelegate</span></span></div><div class="line"></div><div class="line">- (<span class="built_in">BOOL</span>)application:(<span class="built_in">UIApplication</span> *)application didFinishLaunchingWithOptions:(<span class="built_in">NSDictionary</span> *)launchOptions &#123;</div><div class="line"></div><div class="line">rebind_symbols((<span class="keyword">struct</span> rebinding[<span class="number">2</span>])&#123;&#123;<span class="string">"socket"</span>, my_socket, (<span class="keyword">void</span> *)&amp;orig_socket&#125;,&#123;<span class="string">"connect"</span>, my_connect, (<span class="keyword">void</span> *)&amp;orig_connect&#125;&#125;, <span class="number">2</span>);</div><div class="line"></div><div class="line"><span class="keyword">return</span> <span class="literal">YES</span>;</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="keyword">@end</span></div></pre></td></tr></table></figure>
+<h2 id="推荐"><a href="#推荐" class="headerlink" title="推荐"></a><strong><em>推荐</em></strong></h2><ol>
+<li><a href="https://github.com/facebook/fishhook" target="_blank" rel="external">Fishhook Github：https://github.com/facebook/fishhook</a></li>
+<li><a href="http://blog.csdn.net/yiyaaixuexi/article/details/19094765" target="_blank" rel="external">iOS安全攻防（十七）：Fishhook：http://blog.csdn.net/yiyaaixuexi/article/details/19094765</a></li>
+</ol>
+
+      
+    </div>
+
+    <div>
+      
+        
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/iOS/" rel="tag">#iOS</a>
+          
+            <a href="/tags/Fishhook/" rel="tag">#Fishhook</a>
+          
+            <a href="/tags/hook/" rel="tag">#hook</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2016/07/16/full-text-search/" rel="next" title="SQLite全文检索">
+                <i class="fa fa-chevron-left"></i> SQLite全文检索
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2016/08/14/reachbility/" rel="prev" title="iOS Reachability 有趣之处">
+                iOS Reachability 有趣之处 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2016/07/22/fishhook/"
+           data-title="iOS Fishhook" data-url="http://boztrail.github.io/2016/07/22/fishhook/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar.png"
+               alt="Boz" />
+          <p class="site-author-name" itemprop="name">Boz</p>
+          <p class="site-description motion-element" itemprop="description">以此站点来mark自己的成长。</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">9</span>
+              <span class="site-state-item-name">日志</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              <a href="/categories">
+                <span class="site-state-item-count">8</span>
+                <span class="site-state-item-name">分类</span>
+              </a>
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">35</span>
+                <span class="site-state-item-name">标签</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+
+        <div class="links-of-author motion-element">
+          
+        </div>
+
+        
+        
+
+        
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#什么是fishhook"><span class="nav-number">1.</span> <span class="nav-text">什么是fishhook?</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#fishhook-原理"><span class="nav-number">1.1.</span> <span class="nav-text">fishhook 原理</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#fishhook-的简单尝试"><span class="nav-number">2.</span> <span class="nav-text">fishhook 的简单尝试</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#推荐"><span class="nav-number">3.</span> <span class="nav-text">推荐</span></a></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy; 
+  <span itemprop="copyrightYear">2017</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Boz</span>
+</div>
+
+<div class="powered-by">
+  由 <a class="theme-link" href="http://hexo.io">Hexo</a> 强力驱动
+</div>
+
+<div class="theme-info">
+  主题 -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Pisces
+  </a>
+</div>
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="/vendors/jquery/index.js?v=2.1.3"></script>
+
+  
+  <script type="text/javascript" src="/vendors/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+
+  
+  <script type="text/javascript" src="/vendors/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+
+  
+  <script type="text/javascript" src="/vendors/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/vendors/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/vendors/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.0.1"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"boztrail"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+  
+
+
+
+
+
+
+  
+  
+  
+
+  
+
+  
+
+</body>
+</html>

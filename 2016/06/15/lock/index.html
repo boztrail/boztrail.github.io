@@ -1,0 +1,702 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next pisces use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/vendors/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.googleapis.com/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+<link href="/vendors/font-awesome/css/font-awesome.min.css?v=4.4.0" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="Lock,NSLock,NSCondition,NSConditionLock,NSRecursiveLock,OSSpinLock,pthread_mutex,dispatch_semaphore,synchronized," />
+
+
+
+
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="看了YY系列作者的不再安全的 OSSpinLock，有心整理一下iOS上会用到的锁，包括OSSpinLock、pthread_mutex、NSCondition、NSRecursiveLock、NSConditionLock，以及能实现锁功能的dispatch_semaphore和@synchronized, OSSpinLock和pthread_mutex的可见性为内核态，其他为用户态。
+谈及各">
+<meta property="og:type" content="article">
+<meta property="og:title" content="线程同步解决方案，各种锁">
+<meta property="og:url" content="http://boztrail.github.io/2016/06/15/lock/index.html">
+<meta property="og:site_name" content="Boz Trail">
+<meta property="og:description" content="看了YY系列作者的不再安全的 OSSpinLock，有心整理一下iOS上会用到的锁，包括OSSpinLock、pthread_mutex、NSCondition、NSRecursiveLock、NSConditionLock，以及能实现锁功能的dispatch_semaphore和@synchronized, OSSpinLock和pthread_mutex的可见性为内核态，其他为用户态。
+谈及各">
+<meta property="og:updated_time" content="2016-06-19T01:15:38.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="线程同步解决方案，各种锁">
+<meta name="twitter:description" content="看了YY系列作者的不再安全的 OSSpinLock，有心整理一下iOS上会用到的锁，包括OSSpinLock、pthread_mutex、NSCondition、NSRecursiveLock、NSConditionLock，以及能实现锁功能的dispatch_semaphore和@synchronized, OSSpinLock和pthread_mutex的可见性为内核态，其他为用户态。
+谈及各">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Pisces',
+    sidebar: {"position":"left","display":"always"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: '博主'
+    }
+  };
+</script>
+
+
+
+
+  <link rel="canonical" href="http://boztrail.github.io/2016/06/15/lock/"/>
+
+  <title> 线程同步解决方案，各种锁 | Boz Trail </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?23d68aa81c63df3f458b440864468232";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Boz Trail</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">喜则息，忧则行。</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br />
+            
+            关于
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                线程同步解决方案，各种锁
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">发表于</span>
+            <time itemprop="dateCreated" datetime="2016-06-15T18:05:28+08:00" content="2016-06-15">
+              2016-06-15
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/iOS/" itemprop="url" rel="index">
+                    <span itemprop="name">iOS</span>
+                  </a>
+                </span>
+
+                
+                
+                  ， 
+                
+
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/iOS/线程同步/" itemprop="url" rel="index">
+                    <span itemprop="name">线程同步</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/06/15/lock/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/06/15/lock/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>看了YY系列作者的<a href="http://blog.ibireme.com/2016/01/16/spinlock_is_unsafe_in_ios" target="_blank" rel="external"><strong>不再安全的 OSSpinLock</strong></a>，有心整理一下iOS上会用到的锁，包括<strong>OSSpinLock</strong>、<strong>pthread_mutex</strong>、<strong>NSCondition</strong>、<strong>NSRecursiveLock</strong>、<strong>NSConditionLock</strong>，以及能实现锁功能的<strong>dispatch_semaphore</strong>和<strong>@synchronized</strong>, OSSpinLock和pthread_mutex的可见性为内核态，其他为用户态。</p>
+<p>谈及各种同步机制的PK，个人觉得<a href="http://springox.w18.net/?p=685" target="_blank" rel="external"><strong>这篇文章</strong></a>整理得比较不错，推荐给大家。(<strong><em>备注:不过纠正一点，这篇文章说MacOS/iOS没有提供读写锁，实际上pthread库里是有提供读写锁的</em></strong>)</p>
+<p>以下会简单整理每种同步方案的特性和使用方法，使用方法都以Objctive-C中不安全NSMutableDictionary的读写为例，先创建NSMutableDictionary:<br><figure class="highlight objc"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line"><span class="built_in">NSMutableDictionary</span> *dict = [<span class="built_in">NSMutableDictionary</span> dictionary];</div></pre></td></tr></table></figure></p>
+<h2 id="OSSpinLock"><a href="#OSSpinLock" class="headerlink" title="OSSpinLock"></a>OSSpinLock</h2><h3 id="特性"><a href="#特性" class="headerlink" title="特性:"></a>特性:</h3><p>OS X/iOS自有的自旋锁，线程等待取锁不挂起，直接保持空转，做忙等待，适用锁区比较短的场景，不支持递归。<br>但OSSpinLock现在已经不再安全，在不同优先级的多线程调度中，会有优先级反转问题，破坏spin lock。</p>
+<h3 id="使用"><a href="#使用" class="headerlink" title="使用:"></a>使用:</h3><figure class="highlight objc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line"><span class="comment">// 创建</span></div><div class="line">OSSpinLock _lock = OS_SPINLOCK_INIT;</div><div class="line"></div><div class="line"><span class="comment">// 加锁解锁：</span></div><div class="line">OSSpinLockLock(&amp;_lock);</div><div class="line">[dict setObject:<span class="string">@"boz"</span> forKey:<span class="string">@"trial"</span>];</div><div class="line">OSSpinLockUnlock(&amp;_lock);</div><div class="line"></div><div class="line">OSSpinLockLock(&amp;_lock);</div><div class="line"><span class="keyword">id</span> obj = [dict objectForKey:<span class="string">@"trial"</span>];</div><div class="line">OSSpinLockUnlock(&amp;_lock);</div><div class="line"></div><div class="line"><span class="comment">//锁尝试：</span></div><div class="line"><span class="keyword">bool</span> success = OSSpinLockTry(&amp;_lock);</div></pre></td></tr></table></figure>
+<h2 id="pthread-mutex"><a href="#pthread-mutex" class="headerlink" title="pthread_mutex"></a>pthread_mutex</h2><h3 id="特性-1"><a href="#特性-1" class="headerlink" title="特性:"></a>特性:</h3><p>多线程库(pthread)基于互斥体的同步锁，是最常用的锁对象，并且支持递归，性能和稳定性都是公认最好的，比较推荐使用。pthread_mutex也有不好的地方，一次只能一个线程持有锁，且阻塞等待对象（阻塞等待对象也是他比自旋锁慢的原因）。</p>
+<h3 id="使用-1"><a href="#使用-1" class="headerlink" title="使用:"></a>使用:</h3><figure class="highlight objc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div></pre></td><td class="code"><pre><div class="line"><span class="comment">// 创建 pthread_mutex_t</span></div><div class="line">pthread_mutex_t _mutex;</div><div class="line"><span class="comment">// 创建 mutexattr</span></div><div class="line">pthread_mutexattr_t attr;</div><div class="line">pthread_mutexattr_init(&amp;attr);</div><div class="line"><span class="comment">// 指定 pthread_mutex_t type</span></div><div class="line"><span class="comment">// 指定 type 为PTHREAD_MUTEX_RECURSIVE 即可支持递归</span></div><div class="line"><span class="number">1.</span> pthread_mutexattr_settype(&amp;attr, PTHREAD_MUTEX_NORMAL);</div><div class="line"><span class="comment">// 创建</span></div><div class="line">pthread_mutex_init(&amp;_mutex, &amp;attr);</div><div class="line">pthread_mutexattr_destroy(&amp;attr);</div><div class="line"></div><div class="line"><span class="comment">// 写数据</span></div><div class="line">pthread_mutex_lock(&amp;_mutex);</div><div class="line">[dict setObject:<span class="string">@"boz"</span> forKey:<span class="string">@"trial"</span>];</div><div class="line">pthread_mutex_unlock(&amp;_mutex);</div><div class="line"></div><div class="line"><span class="comment">// 读数据</span></div><div class="line">pthread_mutex_lock(&amp;_mutex);</div><div class="line"><span class="keyword">id</span> obj = [dict objectForKey:<span class="string">@"trail"</span>];</div><div class="line">pthread_mutex_unlock(&amp;_mutex);</div><div class="line"></div><div class="line"><span class="comment">// 释放 pthread_mutex_t</span></div><div class="line">pthread_mutex_destroy(&amp;_mutex);</div></pre></td></tr></table></figure>
+<h2 id="dispatch-semaphore"><a href="#dispatch-semaphore" class="headerlink" title="dispatch_semaphore"></a>dispatch_semaphore</h2><h3 id="特性-2"><a href="#特性-2" class="headerlink" title="特性:"></a>特性:</h3><p>GCD中用于控制多线程并发的信号量，可以通过wait/signal的信号事件控制多线程最大并发数，当最大并发数控制在1的时候，就可以当做同步锁使用，但这种方式不支持递归。</p>
+<h3 id="使用-2"><a href="#使用-2" class="headerlink" title="使用:"></a>使用:</h3><figure class="highlight objc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="comment">// 创建</span></div><div class="line">dispatch_semaphore_t semaphore = dispatch_semaphore_create(<span class="number">1</span>);</div><div class="line"><span class="comment">// 加解锁</span></div><div class="line">dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);</div><div class="line">[dict setObject:<span class="string">@"boz"</span> forKey:<span class="string">@"trial"</span>];</div><div class="line">dispatch_semaphore_signal(semaphore);</div></pre></td></tr></table></figure>
+<h2 id="NSLock-NSRecursiveLock"><a href="#NSLock-NSRecursiveLock" class="headerlink" title="NSLock/NSRecursiveLock"></a>NSLock/NSRecursiveLock</h2><h3 id="特性-3"><a href="#特性-3" class="headerlink" title="特性:"></a>特性:</h3><p>都是Apple官方实现提供的面向对象的同步锁，都遵循Objective-C的NSLocking协议，NSLock支持tryLock，NSRecursiveLock支持递归(递归锁).</p>
+<h3 id="使用-3"><a href="#使用-3" class="headerlink" title="使用:"></a>使用:</h3><figure class="highlight objc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line"><span class="comment">// 使用方式一样 都已Lock标识</span></div><div class="line"><span class="keyword">id</span> lock = [[Lock alloc] init];</div><div class="line"><span class="comment">// NSLock 支持</span></div><div class="line"><span class="keyword">bool</span> success = [lock tryLock];</div><div class="line"><span class="comment">// 加解锁</span></div><div class="line">[lock lock];</div><div class="line">[dict setObject:<span class="string">@"boz"</span> forKey:<span class="string">@"trial"</span>];</div><div class="line">[lock unLock];</div></pre></td></tr></table></figure>
+<h2 id="NSCondition-NSConditionLock"><a href="#NSCondition-NSConditionLock" class="headerlink" title="NSCondition/NSConditionLock"></a>NSCondition/NSConditionLock</h2><h3 id="特性-4"><a href="#特性-4" class="headerlink" title="特性:"></a>特性:</h3><p>基于信号量方式实现的锁对象，用来解决类似生产者消费者问题，前者提供单独的信号量管理接口，相比后者用法上可以更为灵活，而后者在接口上更为直接、实用；</p>
+<h3 id="使用-4"><a href="#使用-4" class="headerlink" title="使用:"></a>使用:</h3><p>NSCondition/NSConditionLock是用来解决类似生产者消费者问题，并不适用保护不安全NSMutableDictionary的读写，下面简单贴出NSCondition实现的生产者消费者问题代码:</p>
+<figure class="highlight objc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div></pre></td><td class="code"><pre><div class="line">- (<span class="keyword">void</span>)testStart</div><div class="line">&#123;</div><div class="line">   products = [[<span class="built_in">NSMutableArray</span> alloc] init];</div><div class="line">   condition = [[<span class="built_in">NSCondition</span> alloc] init];</div><div class="line">   <span class="built_in">dispatch_async</span>(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, <span class="number">0</span>), ^&#123;</div><div class="line">    [<span class="keyword">self</span> createProducter];</div><div class="line">	&#125;);</div><div class="line">	<span class="built_in">dispatch_async</span>(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, <span class="number">0</span>), ^&#123;</div><div class="line">    [<span class="keyword">self</span> createConsumenr];</div><div class="line">	&#125;);</div><div class="line">&#125;</div><div class="line"> </div><div class="line">- (<span class="keyword">void</span>)createConsumenr</div><div class="line">&#123;</div><div class="line">    [condition lock];</div><div class="line">    <span class="keyword">while</span> ([products count] == <span class="number">0</span>) &#123;</div><div class="line">   		<span class="comment">// 消费者等待生产者生成 	</span></div><div class="line">   		[condition wait];</div><div class="line">   &#125;</div><div class="line">   	<span class="comment">// 消费者消费</span></div><div class="line">   [products removeObjectAtIndex:<span class="number">0</span>];</div><div class="line">   [condition unlock];</div><div class="line">&#125;</div><div class="line"> </div><div class="line">- (<span class="keyword">void</span>)createProducter</div><div class="line">&#123;</div><div class="line">   [condition lock];</div><div class="line">   [products addObject:[[<span class="built_in">NSObject</span> alloc] init]];</div><div class="line">	<span class="comment">// 生产者生产</span></div><div class="line">   [condition signal];</div><div class="line">   [condition unlock];</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<h2 id="synchronized"><a href="#synchronized" class="headerlink" title="@synchronized(){}"></a>@synchronized(){}</h2><h3 id="特性-5"><a href="#特性-5" class="headerlink" title="特性:"></a>特性:</h3><p>Objective-C实现的同步语法，可以给任何Objective-C对象加锁，block里执行锁区代码。@synchronizd(){}在多线程同步方案中效率是最低，原因是他的block会隐式添加异常处理来保护代码块，但@synchronizd(){}在代码书写方面比较简便。</p>
+<h3 id="使用-5"><a href="#使用-5" class="headerlink" title="使用:"></a>使用:</h3><figure class="highlight objc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line"><span class="comment">// 写数据</span></div><div class="line"><span class="built_in">dispatch_async</span>(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, <span class="number">0</span>), ^&#123;</div><div class="line">    <span class="keyword">@synchronized</span> (dict) &#123;</div><div class="line">        [dict setObject:<span class="string">@"boz"</span> forKey:<span class="string">@"trail"</span>];</div><div class="line">    &#125;</div><div class="line">&#125;);</div><div class="line"></div><div class="line"><span class="comment">// 读数据</span></div><div class="line"><span class="built_in">dispatch_async</span>(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, <span class="number">0</span>), ^&#123;</div><div class="line">    <span class="keyword">@synchronized</span> (dict) &#123;</div><div class="line">        <span class="keyword">id</span> obj = [dict objectForKey:<span class="string">@"trail"</span>];</div><div class="line">    &#125;</div><div class="line">&#125;);</div></pre></td></tr></table></figure>
+<h2 id="property-之-atomic"><a href="#property-之-atomic" class="headerlink" title="property 之 atomic"></a>property 之 atomic</h2><p>Objective-C中属性的可选操作atomic，利用get/set接口的属性实现原子操作，以确保对象的属性变量在多线程中读写安全，这也实现了同步读写操作。</p>
+<h3 id="引用"><a href="#引用" class="headerlink" title="引用:"></a><strong><em>引用:</em></strong></h3><ol>
+<li><a href="http://springox.w18.net/?p=685" target="_blank" rel="external">起底多线程同步锁：http://springox.w18.net/?p=685</a></li>
+<li><a href="http://blog.ibireme.com/2016/01/16/spinlock_is_unsafe_in_ios" target="_blank" rel="external">不再安全的 OSSpinLock：http://blog.ibireme.com/2016/01/16/spinlock_is_unsafe_in_ios</a></li>
+<li><a href="http://blog.csdn.net/meegomeego/article/details/39546765" target="_blank" rel="external">对iOS锁的一些研究：http://blog.csdn.net/meegomeego/article/details/39546765</a></li>
+</ol>
+
+      
+    </div>
+
+    <div>
+      
+        
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Lock/" rel="tag">#Lock</a>
+          
+            <a href="/tags/NSLock/" rel="tag">#NSLock</a>
+          
+            <a href="/tags/NSCondition/" rel="tag">#NSCondition</a>
+          
+            <a href="/tags/NSConditionLock/" rel="tag">#NSConditionLock</a>
+          
+            <a href="/tags/NSRecursiveLock/" rel="tag">#NSRecursiveLock</a>
+          
+            <a href="/tags/OSSpinLock/" rel="tag">#OSSpinLock</a>
+          
+            <a href="/tags/pthread-mutex/" rel="tag">#pthread_mutex</a>
+          
+            <a href="/tags/dispatch-semaphore/" rel="tag">#dispatch_semaphore</a>
+          
+            <a href="/tags/synchronized/" rel="tag">#synchronized</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2016/06/14/xcode-breakpoint/" rel="next" title="新技能Get，Xcode调试大法（断点）">
+                <i class="fa fa-chevron-left"></i> 新技能Get，Xcode调试大法（断点）
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2016/06/19/lock-test/" rel="prev" title="线程同步解决方案，简单测试">
+                线程同步解决方案，简单测试 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2016/06/15/lock/"
+           data-title="线程同步解决方案，各种锁" data-url="http://boztrail.github.io/2016/06/15/lock/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar.png"
+               alt="Boz" />
+          <p class="site-author-name" itemprop="name">Boz</p>
+          <p class="site-description motion-element" itemprop="description">以此站点来mark自己的成长。</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">9</span>
+              <span class="site-state-item-name">日志</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              <a href="/categories">
+                <span class="site-state-item-count">8</span>
+                <span class="site-state-item-name">分类</span>
+              </a>
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">35</span>
+                <span class="site-state-item-name">标签</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+
+        <div class="links-of-author motion-element">
+          
+        </div>
+
+        
+        
+
+        
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#OSSpinLock"><span class="nav-number">1.</span> <span class="nav-text">OSSpinLock</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#特性"><span class="nav-number">1.1.</span> <span class="nav-text">特性:</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#使用"><span class="nav-number">1.2.</span> <span class="nav-text">使用:</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#pthread-mutex"><span class="nav-number">2.</span> <span class="nav-text">pthread_mutex</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#特性-1"><span class="nav-number">2.1.</span> <span class="nav-text">特性:</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#使用-1"><span class="nav-number">2.2.</span> <span class="nav-text">使用:</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#dispatch-semaphore"><span class="nav-number">3.</span> <span class="nav-text">dispatch_semaphore</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#特性-2"><span class="nav-number">3.1.</span> <span class="nav-text">特性:</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#使用-2"><span class="nav-number">3.2.</span> <span class="nav-text">使用:</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#NSLock-NSRecursiveLock"><span class="nav-number">4.</span> <span class="nav-text">NSLock/NSRecursiveLock</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#特性-3"><span class="nav-number">4.1.</span> <span class="nav-text">特性:</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#使用-3"><span class="nav-number">4.2.</span> <span class="nav-text">使用:</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#NSCondition-NSConditionLock"><span class="nav-number">5.</span> <span class="nav-text">NSCondition/NSConditionLock</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#特性-4"><span class="nav-number">5.1.</span> <span class="nav-text">特性:</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#使用-4"><span class="nav-number">5.2.</span> <span class="nav-text">使用:</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#synchronized"><span class="nav-number">6.</span> <span class="nav-text">@synchronized(){}</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#特性-5"><span class="nav-number">6.1.</span> <span class="nav-text">特性:</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#使用-5"><span class="nav-number">6.2.</span> <span class="nav-text">使用:</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#property-之-atomic"><span class="nav-number">7.</span> <span class="nav-text">property 之 atomic</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#引用"><span class="nav-number">7.1.</span> <span class="nav-text">引用:</span></a></li></ol></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy; 
+  <span itemprop="copyrightYear">2017</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Boz</span>
+</div>
+
+<div class="powered-by">
+  由 <a class="theme-link" href="http://hexo.io">Hexo</a> 强力驱动
+</div>
+
+<div class="theme-info">
+  主题 -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Pisces
+  </a>
+</div>
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="/vendors/jquery/index.js?v=2.1.3"></script>
+
+  
+  <script type="text/javascript" src="/vendors/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+
+  
+  <script type="text/javascript" src="/vendors/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+
+  
+  <script type="text/javascript" src="/vendors/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/vendors/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/vendors/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.0.1"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"boztrail"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+  
+
+
+
+
+
+
+  
+  
+  
+
+  
+
+  
+
+</body>
+</html>

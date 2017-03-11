@@ -1,0 +1,698 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next pisces use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/vendors/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.googleapis.com/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+<link href="/vendors/font-awesome/css/font-awesome.min.css?v=4.4.0" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="sqlite,FTS3,FTS4,分词,分词器,FMDB," />
+
+
+
+
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="注:示例基于iOS平台
+随App里内容的增多，查找的复杂度也越来越高，用户操作就会显得很麻烦，简单举个例子，社交App的聊天记录随时间积累到一定程度的时候，想查看历史聊天记录，就得在App里慢慢翻历史消息到之前聊过的地方，查看成本非常高，这时候在App里做全文检索就显得很必要。
+那全文检索的实现复杂度怎么样呢，其实只要熟悉SQLite的使用，再了解一下SQLite FTS的特性，就能很简单的添加此">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SQLite全文检索">
+<meta property="og:url" content="http://boztrail.github.io/2016/07/16/full-text-search/index.html">
+<meta property="og:site_name" content="Boz Trail">
+<meta property="og:description" content="注:示例基于iOS平台
+随App里内容的增多，查找的复杂度也越来越高，用户操作就会显得很麻烦，简单举个例子，社交App的聊天记录随时间积累到一定程度的时候，想查看历史聊天记录，就得在App里慢慢翻历史消息到之前聊过的地方，查看成本非常高，这时候在App里做全文检索就显得很必要。
+那全文检索的实现复杂度怎么样呢，其实只要熟悉SQLite的使用，再了解一下SQLite FTS的特性，就能很简单的添加此">
+<meta property="og:image" content="http://boztrail.github.io/full-text-search/token.png">
+<meta property="og:updated_time" content="2016-07-16T15:57:54.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="SQLite全文检索">
+<meta name="twitter:description" content="注:示例基于iOS平台
+随App里内容的增多，查找的复杂度也越来越高，用户操作就会显得很麻烦，简单举个例子，社交App的聊天记录随时间积累到一定程度的时候，想查看历史聊天记录，就得在App里慢慢翻历史消息到之前聊过的地方，查看成本非常高，这时候在App里做全文检索就显得很必要。
+那全文检索的实现复杂度怎么样呢，其实只要熟悉SQLite的使用，再了解一下SQLite FTS的特性，就能很简单的添加此">
+<meta name="twitter:image" content="http://boztrail.github.io/full-text-search/token.png">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Pisces',
+    sidebar: {"position":"left","display":"always"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: '博主'
+    }
+  };
+</script>
+
+
+
+
+  <link rel="canonical" href="http://boztrail.github.io/2016/07/16/full-text-search/"/>
+
+  <title> SQLite全文检索 | Boz Trail </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?23d68aa81c63df3f458b440864468232";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Boz Trail</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">喜则息，忧则行。</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br />
+            
+            关于
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                SQLite全文检索
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">发表于</span>
+            <time itemprop="dateCreated" datetime="2016-07-16T14:54:43+08:00" content="2016-07-16">
+              2016-07-16
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/SQLite/" itemprop="url" rel="index">
+                    <span itemprop="name">SQLite</span>
+                  </a>
+                </span>
+
+                
+                
+                  ， 
+                
+
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/SQLite/FTS/" itemprop="url" rel="index">
+                    <span itemprop="name">FTS</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/07/16/full-text-search/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/07/16/full-text-search/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p><strong><em>注:示例基于iOS平台</em></strong></p>
+<p>随App里内容的增多，查找的复杂度也越来越高，用户操作就会显得很麻烦，简单举个例子，社交App的聊天记录随时间积累到一定程度的时候，想查看历史聊天记录，就得在App里慢慢翻历史消息到之前聊过的地方，查看成本非常高，这时候在App里做全文检索就显得很必要。</p>
+<p>那全文检索的实现复杂度怎么样呢，其实只要熟悉SQLite的使用，再了解一下SQLite FTS的特性，就能很简单的添加此功能，下面就介绍一下自己的关于全文检索的理解，不足之处望指出。</p>
+<h2 id="FTS"><a href="#FTS" class="headerlink" title="FTS"></a>FTS</h2><p>首先简单介绍一下FTS，全称<strong>Full Text Search</strong>，也就是全文检索，是Sqlite自带的功能模块，基于虚表、分词器及文件实现的全文检索方案，检索结果的理想程度跟分词器有关，分词器越智能，检索结果越理想。SQLite的版本有多个，主要使用FTS3和FTS4，FTS5也发布了，但需要自己编译才能使用，<a href="https://www.sqlite.org/fts3.html" target="_blank" rel="external"><strong>详细的FTS文档参考这</strong></a>，下面几条主要先介绍FTS的相关概念及语法:</p>
+<h3 id="1-Tokenizer-分词器"><a href="#1-Tokenizer-分词器" class="headerlink" title="1.Tokenizer(分词器)"></a>1.Tokenizer(分词器)</h3><p>分词器是FTS的核心，没有分词器模块，FTS就没法工作，分词器主要是将输入文本进行拆分，以便SQLite进行Match，例如一段文本“<strong>全文检索</strong>”,可能被拆分为“<strong>全文</strong>、<strong>检索</strong>”，也可能本拆分为“<strong>全</strong>、<strong>文</strong>、<strong>检</strong>、<strong>索</strong>”，最终检索结果也完全取决于分词器的拆分。假设上面两种拆分分别为<strong>A</strong>和<strong>B</strong>，那全文检索的时候检索“<strong>文</strong>”和“<strong>全文</strong>”，“<strong>文</strong>”在<strong>A</strong>方案中是没法检索出文的，而<strong>B</strong>方案可以，“<strong>全文</strong>“在<strong>A、B</strong>方案中都能检索出来，这就是分词器的大概作用。<br>SQLite也提供了相关分词器，比如<strong>simple、icu、unicode61</strong>等，只有icu、unicode61支持中文，但unicode61按标点拆分，不可用，而icu是按字拆分的，可以用，只是检索结果会比较乱。</p>
+<h3 id="2-MATCH"><a href="#2-MATCH" class="headerlink" title="2.MATCH"></a>2.MATCH</h3><p>MATCH是FTS的检索操作，MATCH会比LIKE快上很多倍，MATCH是全匹配，MATCH还可以执行MATCH * 操作，类似于LIKE 的后%操作，就是前缀匹配，下面会有使用实例，继续。</p>
+<h3 id="3-offsets"><a href="#3-offsets" class="headerlink" title="3.offsets"></a>3.offsets</h3><p>offset类似于SQLite里的count，是一个功能函数，获取匹配结果在文本中的位置偏移，最终会获取到匹配文本在数据表中的第几行、第几列、已经匹配文本的Range，详细参考<a href="https://www.sqlite.org/fts3.html" target="_blank" rel="external"><strong>官方文档</strong></a>。</p>
+<h3 id="4-snippet"><a href="#4-snippet" class="headerlink" title="4.snippet"></a>4.snippet</h3><p>snippet也类似于offsets，都是用于获取匹配文本的位置，方便查询结果的高亮处理，语法如下：<strong>snippet(table name, [, ], …, 1, 10) as text;参数分别是table name、关键字左括弧、关键字右括弧、省略符，生效列，关键字前后字符限制，</strong>例如在文本“<strong>xxxxxxxxxxxxxx位置xxxxxxxxxxxx</strong>”中Match“<strong>位置</strong>”，得到的结果为：“<strong>…xxxxxxxxxx[位置]xxxxxxxxxx</strong>…”。简单说就是将匹配到的文本括起来，这里用的<strong>[]</strong>括号，匹配位置距文本首尾过长都会以指定的<strong>…</strong>省略。</p>
+<h2 id="FMDB（FTS）"><a href="#FMDB（FTS）" class="headerlink" title="FMDB（FTS）"></a>FMDB（FTS）</h2><p>iOS平台的FMDB在最新版本中拓展了FTS3的支持，其拓展简单理解就是自定义分词器的接入，FMDB基于CFStringTransform实现了以词为单位做拆分的分词器，基本能满足检索需要。下面是FMDB加载自定义分词器的示例代码:</p>
+<figure class="highlight objc"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line"><span class="comment">// 创建分词器</span></div><div class="line">FMSimpleTokenizer *simpleTok = [[FMSimpleTokenizer alloc] initWithLocale:<span class="literal">NULL</span>];</div><div class="line"><span class="comment">// 安装分词器模块 默认为fmdb</span></div><div class="line">[db installTokenizerModule];</div><div class="line"><span class="comment">// 注册具体的分词器</span></div><div class="line">[FMDatabase registerTokenizer:simpleTok withKey:<span class="string">@"simple"</span>];</div><div class="line"><span class="comment">// 使用</span></div><div class="line">CREATE VRITUAL TABLE doc USING FTS3(subject,body,tokeniz=fmdb simple);</div></pre></td></tr></table></figure>
+<p>不使用FMDB的话也可以按官方文档实现分词器模块，并以SQL语句直接注册自定义分词器，参考如下FMDB代码:<br><img src="full-text-search/token.png" alt="注册自定义分词器"></p>
+<h2 id="全文检索"><a href="#全文检索" class="headerlink" title="全文检索"></a>全文检索</h2><p>首先创建FTS虚拟表，指定分词器为（fmdb simple）,分词器的注册如上文介绍，创建语法如下:<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">CREATE</span> VRITUAL <span class="keyword">TABLE</span> doc <span class="keyword">USING</span> FTS3(subject,<span class="keyword">body</span>,tokeniz=fmdb simple);</div></pre></td></tr></table></figure></p>
+<p>更新数据到FTS表:<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> doc (subject,<span class="keyword">body</span>) <span class="keyword">VALUES</span> (<span class="string">'tokenizer test'</span>,<span class="string">'这是关于SQLite分词器的测试'</span>)；</div></pre></td></tr></table></figure></p>
+<p>群文检索语法:<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line"><span class="comment">-- 普通检索</span></div><div class="line"><span class="keyword">SELECT</span> * <span class="keyword">FROM</span> doc <span class="keyword">WHERE</span> doc <span class="keyword">MATCH</span> <span class="string">'测试'</span>;</div><div class="line"><span class="comment">-- MATCH * 检索</span></div><div class="line"><span class="keyword">SELECT</span> * <span class="keyword">FROM</span> doc <span class="keyword">WHERE</span> doc <span class="keyword">MATCH</span> <span class="string">'测*'</span>;</div><div class="line"><span class="comment">-- MATCH 指定字段 检索</span></div><div class="line"><span class="keyword">SELECT</span> * <span class="keyword">FROM</span> doc <span class="keyword">WHERE</span> doc <span class="keyword">MATCH</span> <span class="string">'body:测'</span>;</div><div class="line"><span class="keyword">SELECT</span> * <span class="keyword">FROM</span> doc <span class="keyword">WHERE</span> doc.body <span class="keyword">MATCH</span> <span class="string">'测*'</span>;</div><div class="line"><span class="comment">-- offsets 语法</span></div><div class="line"><span class="keyword">SELECT</span> subject,<span class="keyword">body</span>,offsets(doc) <span class="keyword">as</span> <span class="keyword">offset</span> <span class="keyword">FROM</span> doc <span class="keyword">WHERE</span> doc <span class="keyword">MATCH</span> <span class="string">'测试'</span>;</div><div class="line"><span class="comment">-- snippet</span></div><div class="line"><span class="keyword">SELECT</span> subject,<span class="keyword">body</span>,snippet(doc,[,],...,<span class="number">2</span>,<span class="number">10</span>) <span class="keyword">FROM</span> doc <span class="keyword">WHERE</span> doc <span class="keyword">MATCH</span> <span class="string">'测试'</span>;</div></pre></td></tr></table></figure></p>
+<p>高亮显示:有上面offsets和snippet两种方式获取关键字range(一般使用snippet)，文本高亮的显示就很简单了。</p>
+<h3 id="博客推荐"><a href="#博客推荐" class="headerlink" title="博客推荐:"></a><strong><em>博客推荐:</em></strong></h3><ol>
+<li><a href="http://hustlzp.com/post/2016/02/ios-full-text-search-using-sqlite-fts4" target="_blank" rel="external">iOS全文检索:使用SQLite FTS4扩展</a></li>
+<li><a href="https://www.sqlite.org/fts3.html" target="_blank" rel="external">SQLite FTS3 and FTS4 Extensions：https://www.sqlite.org/fts3.html</a></li>
+</ol>
+
+      
+    </div>
+
+    <div>
+      
+        
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/sqlite/" rel="tag">#sqlite</a>
+          
+            <a href="/tags/FTS3/" rel="tag">#FTS3</a>
+          
+            <a href="/tags/FTS4/" rel="tag">#FTS4</a>
+          
+            <a href="/tags/分词/" rel="tag">#分词</a>
+          
+            <a href="/tags/分词器/" rel="tag">#分词器</a>
+          
+            <a href="/tags/FMDB/" rel="tag">#FMDB</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2016/07/16/chinese-transform/" rel="next" title="CFStringTransform汉字转拼音">
+                <i class="fa fa-chevron-left"></i> CFStringTransform汉字转拼音
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2016/07/22/fishhook/" rel="prev" title="iOS Fishhook">
+                iOS Fishhook <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2016/07/16/full-text-search/"
+           data-title="SQLite全文检索" data-url="http://boztrail.github.io/2016/07/16/full-text-search/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar.png"
+               alt="Boz" />
+          <p class="site-author-name" itemprop="name">Boz</p>
+          <p class="site-description motion-element" itemprop="description">以此站点来mark自己的成长。</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">9</span>
+              <span class="site-state-item-name">日志</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              <a href="/categories">
+                <span class="site-state-item-count">8</span>
+                <span class="site-state-item-name">分类</span>
+              </a>
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">35</span>
+                <span class="site-state-item-name">标签</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+
+        <div class="links-of-author motion-element">
+          
+        </div>
+
+        
+        
+
+        
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#FTS"><span class="nav-number">1.</span> <span class="nav-text">FTS</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-Tokenizer-分词器"><span class="nav-number">1.1.</span> <span class="nav-text">1.Tokenizer(分词器)</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-MATCH"><span class="nav-number">1.2.</span> <span class="nav-text">2.MATCH</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-offsets"><span class="nav-number">1.3.</span> <span class="nav-text">3.offsets</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-snippet"><span class="nav-number">1.4.</span> <span class="nav-text">4.snippet</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#FMDB（FTS）"><span class="nav-number">2.</span> <span class="nav-text">FMDB（FTS）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#全文检索"><span class="nav-number">3.</span> <span class="nav-text">全文检索</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#博客推荐"><span class="nav-number">3.1.</span> <span class="nav-text">博客推荐:</span></a></li></ol></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy; 
+  <span itemprop="copyrightYear">2017</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Boz</span>
+</div>
+
+<div class="powered-by">
+  由 <a class="theme-link" href="http://hexo.io">Hexo</a> 强力驱动
+</div>
+
+<div class="theme-info">
+  主题 -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Pisces
+  </a>
+</div>
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="/vendors/jquery/index.js?v=2.1.3"></script>
+
+  
+  <script type="text/javascript" src="/vendors/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+
+  
+  <script type="text/javascript" src="/vendors/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+
+  
+  <script type="text/javascript" src="/vendors/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/vendors/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/vendors/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.0.1"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"boztrail"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+  
+
+
+
+
+
+
+  
+  
+  
+
+  
+
+  
+
+</body>
+</html>
